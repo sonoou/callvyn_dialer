@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/headsup_card_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_headsup_card"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp"
+    android:gravity="center_vertical">
+
+    <ImageView
+        android:id="@+id/iv_caller_avatar"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:src="@mipmap/ic_launcher"
+        android:scaleType="centerInside" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="10dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_caller_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Caller Name"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/tv_caller_number"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Incoming Call"
+            android:textColor="#8E8E93"
+            android:textSize="13sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Red Reject Button -->
+        <ImageView
+            android:id="@+id/btn_reject_call"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_btn_reject_circle"
+            android:src="@drawable/ic_call_end_white"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:contentDescription="Decline" />
+
+        <Space
+            android:layout_width="14dp"
+            android:layout_height="1dp" />
+
+        <!-- Green Accept Button -->
+        <ImageView
+            android:id="@+id/btn_answer_call"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_btn_answer_circle"
+            android:src="@drawable/ic_call_white"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:contentDescription="Answer" />
+    </LinearLayout>
+</LinearLayout>
