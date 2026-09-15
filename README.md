@@ -17,9 +17,11 @@ A fast, responsive, and MIUI-styled dialer application built using **Flutter** f
   - Fast search and direct contact dialer.
   - Single and bulk call log deletion.
   - Contact vCard and text sharing.
-- **In-Call Utilities**:
-  - Call Recording engine with Hardware AEC (Acoustic Echo Canceler) and AAC ADTS encoding.
-  - Call Notes: write, save, and export notes taken during calls.
+- **Call Recording Engine**:
+  - **With Root Access (`su`)**: Full two-way crystal-clear voice call recording enabled by granting privileged internal audio permissions (`CAPTURE_AUDIO_OUTPUT`, `MODIFY_PHONE_STATE`) and attaching hardware AEC (Acoustic Echo Canceler) + AAC ADTS encoding.
+  - **Without Root Access**: On Android 10+ devices, third-party apps are restricted by Android OS security policies from capturing internal call audio streams directly. Full two-way call recording without root is only possible if the app is installed as a **System App** (`/system/priv-app/`). For non-rooted standard app installations, recording uses the standard microphone stream fallback.
+- **In-Call Utilities & Notes**:
+  - Call Notes: write, save, export, and share notes taken during live calls.
 - **System Integration**:
   - Default dialer role management and fallback handling.
   - System wallpaper extraction for background styling.
