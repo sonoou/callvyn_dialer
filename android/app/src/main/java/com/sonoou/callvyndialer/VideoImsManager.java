@@ -14,17 +14,21 @@ import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 import android.telecom.VideoProfile;
 import android.telephony.SubscriptionManager;
-import android.telephony.ims.ImsMmTelManager;
-import android.telephony.ims.feature.MmTelFeature;
-import android.telephony.ims.stub.ImsRegistrationImplBase;
 import android.util.Log;
 import android.view.Surface;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 public class VideoImsManager {
     private static final String TAG = "VideoImsManager";
     public static VideoImsManager instance;
+
+    // AOSP Telecom & IMS constants for compatibility across all SDK versions
+    private static final int CAPABILITY_CAN_UPGRADE_TO_VIDEO = 0x00800000;
+    private static final int IMS_CAPABILITY_TYPE_VIDEO = 2; // MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO
+    private static final int REGISTRATION_TECH_LTE = 0;    // ImsRegistrationImplBase.REGISTRATION_TECH_LTE
+    private static final int REGISTRATION_TECH_IWLAN = 1;  // ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN
 
     private final Context context;
     private final int subscriptionId;
@@ -70,34 +74,39 @@ public class VideoImsManager {
                     boolean canLocalRx = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_RX) != 0;
                     boolean canLocalBi = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_BIDIRECTIONAL) != 0;
                     boolean canRemoteBi = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_REMOTE_BIDIRECTIONAL) != 0;
-                    boolean canUpgrade = (caps & Call.Details.CAPABILITY_CAN_UPGRADE_TO_VIDEO) != 0;
+                    boolean canUpgrade = (caps & CAPABILITY_CAN_UPGRADE_TO_VIDEO) != 0;
                     if (canLocalTx || canLocalRx || canLocalBi || canRemoteBi || canUpgrade) {
                         return true;
                     }
                 }
             }
 
-            // 2. Query framework ImsMmTelManager if available (Android 11+ / ImsTestService reference)
+            // 2. Query framework ImsMmTelManager via reflection (Android 11+ / ImsTestService reference)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 try {
                     int targetSubId = subscriptionId != 0 ? subscriptionId : SubscriptionManager.getDefaultVoiceSubscriptionId();
                     if (targetSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                        ImsMmTelManager imsManager = ImsMmTelManager.createForSubscriptionId(targetSubId);
+                        Class<?> imsClass = Class.forName("android.telephony.ims.ImsMmTelManager");
+                        Method createMethod = imsClass.getMethod("createForSubscriptionId", int.class);
+                        Object imsManager = createMethod.invoke(null, targetSubId);
                         if (imsManager != null) {
-                            boolean isLteVideo = imsManager.isAvailable(
-                                MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO,
-                                ImsRegistrationImplBase.REGISTRATION_TECH_LTE
+                            Method isAvailableMethod = imsClass.getMethod("isAvailable", int.class, int.class);
+                            Object isLteVideo = isAvailableMethod.invoke(
+                                imsManager,
+                                IMS_CAPABILITY_TYPE_VIDEO,
+                                REGISTRATION_TECH_LTE
                             );
-                            boolean isWifiVideo = imsManager.isAvailable(
-                                MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO,
-                                ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN
+                            Object isWifiVideo = isAvailableMethod.invoke(
+                                imsManager,
+                                IMS_CAPABILITY_TYPE_VIDEO,
+                                REGISTRATION_TECH_IWLAN
                             );
-                            if (isLteVideo || isWifiVideo) {
+                            if (Boolean.TRUE.equals(isLteVideo) || Boolean.TRUE.equals(isWifiVideo)) {
                                 return true;
                             }
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Throwable ignored) {}
             }
 
             // 3. Fallback: Query TelecomManager call-capable accounts
