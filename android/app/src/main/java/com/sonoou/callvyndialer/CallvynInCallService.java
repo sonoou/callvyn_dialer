@@ -242,6 +242,11 @@ public class CallvynInCallService extends InCallService {
                     call.answer(targetState);
                 }
                 if (isVid) {
+                    if (instance != null) {
+                        try {
+                            instance.setAudioRoute(CallAudioState.ROUTE_SPEAKER);
+                        } catch (Exception ignored) {}
+                    }
                     InCallService.VideoCall vCall = (call != null ? call.getVideoCall() : null);
                     if (vCall == null) vCall = currentVideoCall;
                     Context ctx = instance != null ? instance : MainActivity.instance;

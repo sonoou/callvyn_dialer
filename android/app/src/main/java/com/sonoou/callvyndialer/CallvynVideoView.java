@@ -1,10 +1,10 @@
 package com.sonoou.callvyndialer;
 
 import android.content.Context;
-import android.graphics.SurfaceTexture;
 import android.util.Log;
 import android.view.Surface;
-import android.view.TextureView;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 
 import io.flutter.plugin.common.StandardMessageCodec;
@@ -13,130 +13,107 @@ import io.flutter.plugin.platform.PlatformViewFactory;
 
 public class CallvynVideoView {
 
-    public static class CallvynRemoteVideoPlatformView implements PlatformView, TextureView.SurfaceTextureListener {
-        private final TextureView textureView;
+    public static class CallvynRemoteVideoPlatformView implements PlatformView, SurfaceHolder.Callback {
+        private final SurfaceView surfaceView;
         private Surface surface;
 
         public CallvynRemoteVideoPlatformView(Context context) {
-            this.textureView = new TextureView(context);
-            this.textureView.setSurfaceTextureListener(this);
-            if (this.textureView.isAvailable() && this.textureView.getSurfaceTexture() != null) {
-                Surface s = new Surface(this.textureView.getSurfaceTexture());
+            this.surfaceView = new SurfaceView(context);
+            this.surfaceView.getHolder().addCallback(this);
+            Surface s = this.surfaceView.getHolder().getSurface();
+            if (s != null && s.isValid()) {
                 this.surface = s;
+                Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: initial surface valid " + s);
                 CallvynInCallService.setRemoteSurface(s);
             }
         }
 
         @Override
         public View getView() {
-            return textureView;
+            return surfaceView;
         }
 
         @Override
         public void dispose() {
             Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: dispose");
             CallvynInCallService.setRemoteSurface(null);
-            if (surface != null) {
-                surface.release();
-                surface = null;
-            }
+            surface = null;
         }
 
         @Override
-        public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-            Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: onSurfaceTextureAvailable (" + width + " x " + height + ")");
-            if (surface != null) {
-                surface.release();
-            }
-            Surface s = new Surface(surfaceTexture);
-            surface = s;
+        public void surfaceCreated(SurfaceHolder holder) {
+            Surface s = holder.getSurface();
+            Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: surfaceCreated " + s);
+            this.surface = s;
             CallvynInCallService.setRemoteSurface(s);
         }
 
         @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
-            Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: onSurfaceTextureSizeChanged (" + width + " x " + height + ")");
-            if (surface != null) {
-                CallvynInCallService.setRemoteSurface(surface);
-            }
+        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            Surface s = holder.getSurface();
+            Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: surfaceChanged (" + width + "x" + height + ") " + s);
+            this.surface = s;
+            CallvynInCallService.setRemoteSurface(s);
         }
 
         @Override
-        public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
-            Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: onSurfaceTextureDestroyed");
+        public void surfaceDestroyed(SurfaceHolder holder) {
+            Log.d("CallvynVideo", "CallvynRemoteVideoPlatformView: surfaceDestroyed");
             CallvynInCallService.setRemoteSurface(null);
-            if (surface != null) {
-                surface.release();
-                surface = null;
-            }
-            return true;
+            this.surface = null;
         }
-
-        @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {}
     }
 
-    public static class CallvynLocalVideoPlatformView implements PlatformView, TextureView.SurfaceTextureListener {
-        private final TextureView textureView;
+    public static class CallvynLocalVideoPlatformView implements PlatformView, SurfaceHolder.Callback {
+        private final SurfaceView surfaceView;
         private Surface surface;
 
         public CallvynLocalVideoPlatformView(Context context) {
-            this.textureView = new TextureView(context);
-            this.textureView.setSurfaceTextureListener(this);
-            if (this.textureView.isAvailable() && this.textureView.getSurfaceTexture() != null) {
-                Surface s = new Surface(this.textureView.getSurfaceTexture());
+            this.surfaceView = new SurfaceView(context);
+            this.surfaceView.setZOrderMediaOverlay(true);
+            this.surfaceView.getHolder().addCallback(this);
+            Surface s = this.surfaceView.getHolder().getSurface();
+            if (s != null && s.isValid()) {
                 this.surface = s;
+                Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: initial surface valid " + s);
                 CallvynInCallService.setLocalSurface(s);
             }
         }
 
         @Override
         public View getView() {
-            return textureView;
+            return surfaceView;
         }
 
         @Override
         public void dispose() {
             Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: dispose");
             CallvynInCallService.setLocalSurface(null);
-            if (surface != null) {
-                surface.release();
-                surface = null;
-            }
+            surface = null;
         }
 
         @Override
-        public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-            Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: onSurfaceTextureAvailable (" + width + " x " + height + ")");
-            if (surface != null) {
-                surface.release();
-            }
-            Surface s = new Surface(surfaceTexture);
-            surface = s;
+        public void surfaceCreated(SurfaceHolder holder) {
+            Surface s = holder.getSurface();
+            Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: surfaceCreated " + s);
+            this.surface = s;
             CallvynInCallService.setLocalSurface(s);
         }
 
         @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
-            Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: onSurfaceTextureSizeChanged (" + width + " x " + height + ")");
-            if (surface != null) {
-                CallvynInCallService.setLocalSurface(surface);
-            }
+        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            Surface s = holder.getSurface();
+            Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: surfaceChanged (" + width + "x" + height + ") " + s);
+            this.surface = s;
+            CallvynInCallService.setLocalSurface(s);
         }
 
         @Override
-        public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
-            Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: onSurfaceTextureDestroyed");
+        public void surfaceDestroyed(SurfaceHolder holder) {
+            Log.d("CallvynVideo", "CallvynLocalVideoPlatformView: surfaceDestroyed");
             CallvynInCallService.setLocalSurface(null);
-            if (surface != null) {
-                surface.release();
-                surface = null;
-            }
-            return true;
+            this.surface = null;
         }
-
-        @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {}
     }
 
     public static class CallvynRemoteVideoViewFactory extends PlatformViewFactory {
