@@ -48,19 +48,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> with WidgetsBindingOb
   }
 
   void _placeOutgoingCall() async {
-    final capable = await VideoCallManager.isVideoCapable(
-      subscriptionId: widget.subscriptionId,
-    );
-
-    if (!capable) {
-      if (mounted) {
-        setState(() {
-          callStatus = 'Video calling not supported';
-        });
-      }
-      return;
-    }
-
     await VideoCallManager.placeVideoCall(
       phoneNumber: widget.phoneNumber,
       subscriptionId: widget.subscriptionId,

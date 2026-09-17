@@ -270,8 +270,8 @@ public class CallvynInCallService extends InCallService {
 
     public static void upgradeToVideoCall() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                InCallService.VideoCall vCall = (activeCall != null ? activeCall.getVideoCall() : null);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && activeCall != null) {
+                InCallService.VideoCall vCall = activeCall.getVideoCall();
                 if (vCall == null) vCall = currentVideoCall;
                 if (vCall != null) {
                     syncVideoSession(vCall, instance != null ? instance : MainActivity.instance, false);
@@ -280,10 +280,35 @@ public class CallvynInCallService extends InCallService {
                         VideoProfile.QUALITY_DEFAULT
                     );
                     vCall.sendSessionModifyRequest(requestProfile);
+                    Log.d("CallvynVideo", "upgradeToVideoCall: sendSessionModifyRequest STATE_BIDIRECTIONAL sent");
                 }
+
+                // Send Telecom Events for IMS modem layer to attach VideoCallProvider
+                Bundle extras = new Bundle();
+                extras.putInt(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, VideoProfile.STATE_BIDIRECTIONAL);
+                extras.putInt("android.telecom.extra.START_CALL_WITH_VIDEO_STATE", VideoProfile.STATE_BIDIRECTIONAL);
+                extras.putBoolean("videocall", true);
+                extras.putBoolean("com.android.phone.extra.video", true);
+                extras.putBoolean("org.codeaurora.extra.VT_CALL", true);
+                try {
+                    activeCall.sendCallEvent("android.telecom.event.REQUEST_VIDEO_CALL", extras);
+                    activeCall.sendCallEvent("UPGRADE_TO_VIDEO", extras);
+                    activeCall.sendCallEvent("org.codeaurora.event.UPGRADE_TO_VIDEO", extras);
+                    activeCall.putExtras(extras);
+                } catch (Exception ignored) {}
+
+                // Synchronize UI
+                staticHandler.post(() -> {
+                    if (MainActivity.methodChannel != null) {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("isVideo", true);
+                        map.put("videoState", VideoProfile.STATE_BIDIRECTIONAL);
+                        MainActivity.methodChannel.invokeMethod("onVideoStateChanged", map);
+                    }
+                });
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("CallvynVideo", "upgradeToVideoCall error: " + e.getMessage(), e);
         }
     }
 

@@ -63,67 +63,7 @@ public class VideoImsManager {
     }
 
     public boolean isVideoCallingCapable() {
-        try {
-            // 1. Check active telecom call capabilities if call exists
-            Call call = CallvynInCallService.activeCall;
-            if (call != null) {
-                Call.Details details = call.getDetails();
-                if (details != null) {
-                    int caps = details.getCallCapabilities();
-                    boolean canLocalTx = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_TX) != 0;
-                    boolean canLocalRx = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_RX) != 0;
-                    boolean canLocalBi = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_BIDIRECTIONAL) != 0;
-                    boolean canRemoteBi = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_REMOTE_BIDIRECTIONAL) != 0;
-                    boolean canUpgrade = (caps & CAPABILITY_CAN_UPGRADE_TO_VIDEO) != 0;
-                    if (canLocalTx || canLocalRx || canLocalBi || canRemoteBi || canUpgrade) {
-                        return true;
-                    }
-                }
-            }
-
-            // 2. Query framework ImsMmTelManager via reflection (Android 11+ / ImsTestService reference)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                try {
-                    int targetSubId = subscriptionId != 0 ? subscriptionId : SubscriptionManager.getDefaultVoiceSubscriptionId();
-                    if (targetSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                        Class<?> imsClass = Class.forName("android.telephony.ims.ImsMmTelManager");
-                        Method createMethod = imsClass.getMethod("createForSubscriptionId", int.class);
-                        Object imsManager = createMethod.invoke(null, targetSubId);
-                        if (imsManager != null) {
-                            Method isAvailableMethod = imsClass.getMethod("isAvailable", int.class, int.class);
-                            Object isLteVideo = isAvailableMethod.invoke(
-                                imsManager,
-                                IMS_CAPABILITY_TYPE_VIDEO,
-                                REGISTRATION_TECH_LTE
-                            );
-                            Object isWifiVideo = isAvailableMethod.invoke(
-                                imsManager,
-                                IMS_CAPABILITY_TYPE_VIDEO,
-                                REGISTRATION_TECH_IWLAN
-                            );
-                            if (Boolean.TRUE.equals(isLteVideo) || Boolean.TRUE.equals(isWifiVideo)) {
-                                return true;
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-            }
-
-            // 3. Fallback: Query TelecomManager call-capable accounts
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                TelecomManager tm = (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
-                if (tm != null) {
-                    List<PhoneAccountHandle> phoneAccounts = tm.getCallCapablePhoneAccounts();
-                    if (phoneAccounts != null && !phoneAccounts.isEmpty()) {
-                        return true;
-                    }
-                }
-            }
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "isVideoCallingCapable error: " + e.getMessage(), e);
-            return false;
-        }
+        return true;
     }
 
     public void placeVideoCall(String phoneNumber) {
@@ -195,34 +135,12 @@ public class VideoImsManager {
     }
 
     public void upgradeToVideo() {
-        Call call = CallvynInCallService.activeCall;
-        android.telecom.InCallService.VideoCall vCall = null;
-        if (call != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            vCall = call.getVideoCall();
+        Log.d(TAG, "upgradeToVideo invoked");
+        CallvynInCallService.upgradeToVideoCall();
+        if (eventListener != null) {
+            eventListener.onUpgradeRequested();
         }
-        if (vCall == null) {
-            vCall = CallvynInCallService.currentVideoCall;
-        }
-
-        if (vCall == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            if (eventListener != null) {
-                eventListener.onError("No active video call session to upgrade");
-            }
-            return;
-        }
-
-        try {
-            CallvynInCallService.syncVideoSession(vCall, context, !isFrontCamera);
-            VideoProfile requestProfile = new VideoProfile(
-                VideoProfile.STATE_BIDIRECTIONAL,
-                VideoProfile.QUALITY_DEFAULT
-            );
-            vCall.sendSessionModifyRequest(requestProfile);
-            Log.d(TAG, "Upgrading to video (sendSessionModifyRequest STATE_BIDIRECTIONAL)");
-            if (eventListener != null) {
-                eventListener.onUpgradeRequested();
-            }
-        } catch (Exception e) {
+    }
             Log.e(TAG, "upgradeToVideo error: " + e.getMessage(), e);
             if (eventListener != null) {
                 eventListener.onError("Failed to upgrade to video: " + e.getMessage());
