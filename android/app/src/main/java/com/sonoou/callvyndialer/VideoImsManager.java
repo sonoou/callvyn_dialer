@@ -136,11 +136,12 @@ public class VideoImsManager {
 
     public void upgradeToVideo() {
         Log.d(TAG, "upgradeToVideo invoked");
-        CallvynInCallService.upgradeToVideoCall();
-        if (eventListener != null) {
-            eventListener.onUpgradeRequested();
-        }
-    }
+        try {
+            CallvynInCallService.upgradeToVideoCall();
+            if (eventListener != null) {
+                eventListener.onUpgradeRequested();
+            }
+        } catch (Exception e) {
             Log.e(TAG, "upgradeToVideo error: " + e.getMessage(), e);
             if (eventListener != null) {
                 eventListener.onError("Failed to upgrade to video: " + e.getMessage());
