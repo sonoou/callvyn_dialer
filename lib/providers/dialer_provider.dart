@@ -131,15 +131,51 @@ class DialerProvider extends ChangeNotifier {
     _initStartupData();
   }
 
+  bool _isDefaultDialerApp = false;
+  bool get isDefaultDialerApp => _isDefaultDialerApp;
+
   void _initStartupData() {
-    // Run data fetching asynchronously without blocking UI initialization
+    // Run data fetching and default dialer prompt asynchronously
     Future.microtask(() async {
+      await checkAndRequestDefaultDialer();
       await fetchDeviceContacts();
       await fetchDeviceCallLogs();
       loadActiveSimSlots();
       loadWallpaper();
       _initBatteryAndForegroundService();
     });
+  }
+
+  Future<bool> isDefaultDialer() async {
+    try {
+      final bool? res = await _simChannel.invokeMethod<bool>('isDefaultDialer');
+      _isDefaultDialerApp = res ?? false;
+      notifyListeners();
+      return _isDefaultDialerApp;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> requestDefaultDialer() async {
+    try {
+      await _simChannel.invokeMethod('requestDefaultDialer');
+      await Future.delayed(const Duration(milliseconds: 500));
+      await isDefaultDialer();
+    } catch (e) {
+      debugPrint('Error requesting default dialer: $e');
+    }
+  }
+
+  Future<void> checkAndRequestDefaultDialer() async {
+    try {
+      final bool isDefault = await isDefaultDialer();
+      if (!isDefault) {
+        await requestDefaultDialer();
+      }
+    } catch (e) {
+      debugPrint('Error checking default dialer on startup: $e');
+    }
   }
 
   Future<void> fetchVideoTextures() async {
@@ -261,13 +297,7 @@ class DialerProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> requestDefaultDialer() async {
-    try {
-      await _simChannel.invokeMethod('requestDefaultDialer');
-    } catch (e) {
-      debugPrint('Error requesting default dialer: $e');
-    }
-  }
+
 
   Future<void> loadActiveSimSlots() async {
     try {

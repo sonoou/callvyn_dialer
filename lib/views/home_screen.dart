@@ -73,6 +73,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (mounted) setState(() {});
     });
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final provider = Provider.of<DialerProvider>(context, listen: false);
+      await provider.checkAndRequestDefaultDialer();
+    });
   }
 
   @override
@@ -90,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final provider = Provider.of<DialerProvider>(context, listen: false);
+      provider.isDefaultDialer();
       provider.fetchDeviceCallLogs();
       provider.fetchDeviceContacts();
     }

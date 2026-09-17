@@ -88,6 +88,29 @@ class SettingsScreen extends StatelessWidget {
         children: [
           const SizedBox(height: 8),
 
+          // Default Phone App Section
+          _buildSectionHeader('DEFAULT PHONE APP'),
+          ListTile(
+            leading: Icon(
+              provider.isDefaultDialerApp ? Icons.check_circle_outline : Icons.phone_android_outlined,
+              color: provider.isDefaultDialerApp ? Colors.green : const Color(0xFF0C84FF),
+            ),
+            title: const Text('Default Phone App', style: TextStyle(fontFamily: MiuiTheme.fontFamily)),
+            subtitle: Text(
+              provider.isDefaultDialerApp
+                  ? 'Callvyn Dialer is set as your default phone app'
+                  : 'Tap to set Callvyn Dialer as default dialer',
+              style: TextStyle(
+                fontFamily: MiuiTheme.fontFamily,
+                color: provider.isDefaultDialerApp ? Colors.green : Colors.grey,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => provider.requestDefaultDialer(),
+          ),
+
+          const Divider(),
+
           // Display & Theme Section
           _buildSectionHeader('DISPLAY & THEME'),
           SwitchListTile(
