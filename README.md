@@ -12,6 +12,12 @@ A fast, responsive, and MIUI-styled dialer application built using **Flutter** f
   - Custom MIUI-styled heads-up incoming call notifications with fast Answer / Reject actions.
   - Active call management: Mute, Speaker, Call Hold/Unhold, and Live In-Call Timer.
   - Interactive DTMF dialpad with audio feedback during active calls.
+- **Native Telecom Video Calling (ViLTE & Carrier IMS)**:
+  - Direct native video calling placement with TelecomManager `VideoProfile.STATE_BIDIRECTIONAL`.
+  - In-call mid-session seamless upgrade / downgrade between Voice and Video calls.
+  - Hardware camera preview (PIP local view) and full-screen remote video rendering via native `TextureView` platform surfaces.
+  - Dynamic front/back camera detection and switching during video calls.
+  - IMS Capability detection based on Android `ImsMmTelManager` standards (LTE / IWLAN / Cross-SIM).
 - **Call Logs & Contacts**:
   - Full call history view with call types (incoming, outgoing, missed, rejected).
   - Fast search and direct contact dialer.
@@ -32,7 +38,6 @@ A fast, responsive, and MIUI-styled dialer application built using **Flutter** f
 
 ## 🔮 Upcoming Feature Updates
 
-- **ViLTE / Native Video Calling**: Complete carrier ViLTE video session negotiation and hardware surface rendering optimization.
 - **Smart Caller Identification**: Built-in phone number identification and spam protection.
 - **Cloud Backup & Sync**: Cloud synchronization for call history and call notes.
 - **Advanced Theme Customization**: Custom colors, custom fonts, and dark mode accents.

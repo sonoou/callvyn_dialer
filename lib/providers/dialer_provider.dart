@@ -72,8 +72,8 @@ class DialerProvider extends ChangeNotifier {
   String _dialPadTones = 'piano'; // 'piano', 'standard', 'silent'
   bool _hapticsEnabled = true;
   bool _autoRecordEnabled = false;
-  String _sim1Name = 'Jio 5G';
-  String _sim2Name = 'Airtel 5G';
+  String _sim1Name = '';
+  String _sim2Name = '';
   final Set<String> _blockedNumbers = {};
   final Map<String, String> _ussdLogMap = {
     '06': '*#06#',
@@ -189,7 +189,14 @@ class DialerProvider extends ChangeNotifier {
 
   void _initCallStateChannel() {
     _simChannel.setMethodCallHandler((call) async {
-      if (call.method == 'onVideoUpgradeRequested') {
+      if (call.method == 'onExternalNumberReceived') {
+        final Map<dynamic, dynamic>? args = call.arguments as Map<dynamic, dynamic>?;
+        final String number = (args?['number'] as String?)?.trim() ?? '';
+        debugPrint('CallvynDial: onExternalNumberReceived got number="$number"');
+        if (number.isNotEmpty) {
+          setDialPadInput(number);
+        }
+      } else if (call.method == 'onVideoUpgradeRequested') {
         final Map<dynamic, dynamic>? args = call.arguments as Map<dynamic, dynamic>?;
         _hasIncomingVideoUpgradeRequest = true;
         _remoteTextureId = (args?['remoteTextureId'] as num?)?.toInt();
@@ -1555,4 +1562,3 @@ class DialerProvider extends ChangeNotifier {
     }
   }
 }
-

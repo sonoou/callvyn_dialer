@@ -17,15 +17,16 @@ public class VideoProviderWrapper {
     private final Context context;
     private Surface displaySurface = null;
     private Surface previewSurface = null;
-    private String selectedCameraId = "1"; // Default to Front Camera
+    private String selectedCameraId = null;
     private boolean isSurfaceReady = false;
     private boolean isCameraOpen = false;
     private boolean pendingCameraOpen = false;
 
     public VideoProviderWrapper(Context context) {
-        this.context = context;
+        this.context = context != null ? context.getApplicationContext() : null;
         instance = this;
-        Log.d(TAG, "VideoProviderWrapper initialized");
+        this.selectedCameraId = VideoImsManager.getCameraId(this.context, false);
+        Log.d(TAG, "VideoProviderWrapper initialized, default camera: " + selectedCameraId);
     }
 
     public void setDisplaySurface(Surface surface) {
@@ -58,12 +59,12 @@ public class VideoProviderWrapper {
 
     public void setCamera(String cameraId) {
         Log.d(TAG, "📸 onSetCamera requested: cameraId=" + cameraId + ", surfacesReady=" + isSurfaceReady);
-        this.selectedCameraId = cameraId;
+        this.selectedCameraId = cameraId != null ? cameraId : VideoImsManager.getCameraId(this.context, false);
         if (isSurfaceReady) {
             openCameraNow(false);
         } else {
             pendingCameraOpen = true;
-            Log.d(TAG, "⏳ Camera pending - strictly waiting for both display and preview surfaces to be attached first");
+            Log.d(TAG, "⏳ Camera pending - waiting for display/preview surfaces");
         }
     }
 
@@ -71,9 +72,9 @@ public class VideoProviderWrapper {
         boolean hasDisplay = displaySurface != null && displaySurface.isValid();
         boolean hasPreview = previewSurface != null && previewSurface.isValid();
 
-        if (hasDisplay && hasPreview) {
+        if (hasDisplay || hasPreview) {
             isSurfaceReady = true;
-            Log.d(TAG, "✅ Both Display and Preview surfaces are READY! Starting camera sequence now...");
+            Log.d(TAG, "✅ Surface available (display=" + hasDisplay + ", preview=" + hasPreview + "). Initializing camera...");
             openCameraNow(false);
         } else {
             isSurfaceReady = false;
@@ -94,8 +95,8 @@ public class VideoProviderWrapper {
         }
 
         try {
-            String camId = selectedCameraId != null ? selectedCameraId : "1";
-            Log.d(TAG, "📸 Executing Step 3: setCamera(" + camId + ") on active VideoCall");
+            String camId = selectedCameraId != null ? selectedCameraId : VideoImsManager.getCameraId(this.context, false);
+            Log.d(TAG, "📸 Executing Step: setCamera(" + camId + ") on active VideoCall");
             vCall.setCamera(camId);
             vCall.setDeviceOrientation(0);
             vCall.setZoom(1.0f);
@@ -119,7 +120,7 @@ public class VideoProviderWrapper {
     }
 
     public void toggleCamera(boolean useBack) {
-        String newCamId = useBack ? "0" : "1";
+        String newCamId = VideoImsManager.getCameraId(this.context, useBack);
         selectedCameraId = newCamId;
         Log.d(TAG, "Toggling camera to: " + newCamId + " (useBack=" + useBack + ")");
         openCameraNow(true);
@@ -151,6 +152,6 @@ public class VideoProviderWrapper {
         pendingCameraOpen = false;
         displaySurface = null;
         previewSurface = null;
-        selectedCameraId = "1";
+        selectedCameraId = null;
     }
 }

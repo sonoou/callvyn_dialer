@@ -2,6 +2,8 @@ package com.sonoou.callvyndialer;
 
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.net.Uri;
@@ -11,6 +13,10 @@ import android.telecom.Call;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 import android.telecom.VideoProfile;
+import android.telephony.SubscriptionManager;
+import android.telephony.ims.ImsMmTelManager;
+import android.telephony.ims.feature.MmTelFeature;
+import android.telephony.ims.stub.ImsRegistrationImplBase;
 import android.util.Log;
 import android.view.Surface;
 
@@ -38,7 +44,7 @@ public class VideoImsManager {
     }
 
     public VideoImsManager(Context context, int subscriptionId) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.subscriptionId = subscriptionId;
         instance = this;
         Log.d(TAG, "VideoImsManager initialized for subId: " + subscriptionId);
@@ -54,6 +60,7 @@ public class VideoImsManager {
 
     public boolean isVideoCallingCapable() {
         try {
+            // 1. Check active telecom call capabilities if call exists
             Call call = CallvynInCallService.activeCall;
             if (call != null) {
                 Call.Details details = call.getDetails();
@@ -63,11 +70,37 @@ public class VideoImsManager {
                     boolean canLocalRx = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_RX) != 0;
                     boolean canLocalBi = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_BIDIRECTIONAL) != 0;
                     boolean canRemoteBi = (caps & Call.Details.CAPABILITY_SUPPORTS_VT_REMOTE_BIDIRECTIONAL) != 0;
-                    if (canLocalTx || canLocalRx || canLocalBi || canRemoteBi) {
+                    boolean canUpgrade = (caps & Call.Details.CAPABILITY_CAN_UPGRADE_TO_VIDEO) != 0;
+                    if (canLocalTx || canLocalRx || canLocalBi || canRemoteBi || canUpgrade) {
                         return true;
                     }
                 }
             }
+
+            // 2. Query framework ImsMmTelManager if available (Android 11+ / ImsTestService reference)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    int targetSubId = subscriptionId != 0 ? subscriptionId : SubscriptionManager.getDefaultVoiceSubscriptionId();
+                    if (targetSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                        ImsMmTelManager imsManager = ImsMmTelManager.createForSubscriptionId(targetSubId);
+                        if (imsManager != null) {
+                            boolean isLteVideo = imsManager.isAvailable(
+                                MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO,
+                                ImsRegistrationImplBase.REGISTRATION_TECH_LTE
+                            );
+                            boolean isWifiVideo = imsManager.isAvailable(
+                                MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO,
+                                ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN
+                            );
+                            if (isLteVideo || isWifiVideo) {
+                                return true;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // 3. Fallback: Query TelecomManager call-capable accounts
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 TelecomManager tm = (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
                 if (tm != null) {
@@ -105,6 +138,22 @@ public class VideoImsManager {
                 extras.putBoolean("com.android.phone.extra.video", true);
                 extras.putBoolean("org.codeaurora.extra.VT_CALL", true);
                 extras.putBoolean("android.intent.extra.VIDEO_CALL", true);
+
+                // If a specific subId / account handle is needed, assign it
+                if (subscriptionId != 0) {
+                    try {
+                        List<PhoneAccountHandle> accounts = telecomManager.getCallCapablePhoneAccounts();
+                        if (accounts != null) {
+                            for (PhoneAccountHandle handle : accounts) {
+                                String id = handle.getId();
+                                if (id != null && (id.contains(String.valueOf(subscriptionId)) || id.contains("sub_" + subscriptionId))) {
+                                    extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle);
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
 
                 telecomManager.placeCall(uri, extras);
                 Log.d(TAG, "placeVideoCall initiated via TelecomManager for: " + cleanNumber);
@@ -154,7 +203,7 @@ public class VideoImsManager {
         }
 
         try {
-            CallvynInCallService.syncVideoSession(vCall, context, false);
+            CallvynInCallService.syncVideoSession(vCall, context, !isFrontCamera);
             VideoProfile requestProfile = new VideoProfile(
                 VideoProfile.STATE_BIDIRECTIONAL,
                 VideoProfile.QUALITY_DEFAULT
@@ -207,11 +256,30 @@ public class VideoImsManager {
         isFrontCamera = !isFrontCamera;
         boolean useBack = !isFrontCamera;
         CallvynInCallService.switchCamera(useBack);
-        String cameraId = useBack ? "0" : "1";
+        String cameraId = getCameraId(context, useBack);
         Log.d(TAG, "Camera toggled to: " + cameraId + " (useBack=" + useBack + ")");
         if (eventListener != null) {
             eventListener.onCameraToggled(cameraId);
         }
+    }
+
+    public static String getCameraId(Context context, boolean useBack) {
+        try {
+            if (context != null) {
+                CameraManager cm = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+                if (cm != null) {
+                    int targetFacing = useBack ? CameraCharacteristics.LENS_FACING_BACK : CameraCharacteristics.LENS_FACING_FRONT;
+                    for (String id : cm.getCameraIdList()) {
+                        CameraCharacteristics cc = cm.getCameraCharacteristics(id);
+                        Integer facing = cc.get(CameraCharacteristics.LENS_FACING);
+                        if (facing != null && facing == targetFacing) {
+                            return id;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return useBack ? "0" : "1";
     }
 
     public void setVideoMuted(boolean muted) {
@@ -276,17 +344,15 @@ public class VideoImsManager {
     public void setDisplaySurface(Surface surface) {
         if (VideoProviderWrapper.instance != null) {
             VideoProviderWrapper.instance.setDisplaySurface(surface);
-        } else {
-            CallvynInCallService.setRemoteSurface(surface);
         }
+        CallvynInCallService.setRemoteSurface(surface);
     }
 
     public void setPreviewSurface(Surface surface) {
         if (VideoProviderWrapper.instance != null) {
             VideoProviderWrapper.instance.setPreviewSurface(surface);
-        } else {
-            CallvynInCallService.setLocalSurface(surface);
         }
+        CallvynInCallService.setLocalSurface(surface);
     }
 
     public void setCamera(String cameraId) {

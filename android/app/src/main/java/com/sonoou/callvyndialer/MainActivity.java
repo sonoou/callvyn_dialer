@@ -96,6 +96,12 @@ public class MainActivity extends FlutterActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // IMPORTANT: extract the pending dial number BEFORE super.onCreate(), because
+        // FlutterActivity's super.onCreate() internally calls configureFlutterEngine(),
+        // which is where deliverPendingDialNumberIfAny() actually sends it to Dart.
+        // If we extract it after super.onCreate(), configureFlutterEngine() has already
+        // run and delivery never happens on cold start.
+        pendingDialNumber = extractDialNumberFromIntent(getIntent());
         super.onCreate(savedInstanceState);
         instance = this;
         CallvynLogger.init(this);
@@ -105,6 +111,53 @@ public class MainActivity extends FlutterActivity {
         configureLockScreenFlags();
         CallvynForegroundService.start(this);
         cleanupPhoneAccounts();
+    }
+
+    // Holds a number extracted from an external ACTION_DIAL / ACTION_VIEW (tel:) intent
+    // until the Flutter MethodChannel is ready to receive it.
+    private String pendingDialNumber = null;
+
+    /**
+     * Extracts a phone number from tel: intents sent by other apps or the system
+     * (e.g. clicking a "tel:+911234567890" link, or another app launching the dialer
+     * with ACTION_DIAL / ACTION_VIEW). Returns null if the intent carries no such number.
+     */
+    private String extractDialNumberFromIntent(Intent intent) {
+        if (intent == null) return null;
+        String action = intent.getAction();
+        android.util.Log.d("CallvynDial", "extractDialNumberFromIntent: action=" + action + ", data=" + intent.getData());
+        if (!Intent.ACTION_DIAL.equals(action) && !Intent.ACTION_VIEW.equals(action)) {
+            return null;
+        }
+        Uri data = intent.getData();
+        if (data == null) return null;
+        String scheme = data.getScheme();
+        if (scheme == null || !(scheme.equals("tel") || scheme.equals("voicemail"))) {
+            return null;
+        }
+        String number = data.getSchemeSpecificPart();
+        if (number == null) return null;
+        // Strip any query params some apps append after the number.
+        int q = number.indexOf('?');
+        if (q >= 0) number = number.substring(0, q);
+        String result = Uri.decode(number).trim();
+        android.util.Log.d("CallvynDial", "extractDialNumberFromIntent: extracted number=" + result);
+        return result;
+    }
+
+    /**
+     * Sends a pending external dial number to Flutter once the MethodChannel is attached.
+     * Called from configureFlutterEngine after methodChannel is set, and from onNewIntent.
+     */
+    private void deliverPendingDialNumberIfAny() {
+        android.util.Log.d("CallvynDial", "deliverPendingDialNumberIfAny: pendingDialNumber=" + pendingDialNumber + ", methodChannel=" + (methodChannel != null));
+        if (pendingDialNumber != null && !pendingDialNumber.isEmpty() && methodChannel != null) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("number", pendingDialNumber);
+            methodChannel.invokeMethod("onExternalNumberReceived", map);
+            android.util.Log.d("CallvynDial", "deliverPendingDialNumberIfAny: sent onExternalNumberReceived with number=" + pendingDialNumber);
+            pendingDialNumber = null;
+        }
     }
 
     private void cleanupPhoneAccounts() {
@@ -127,6 +180,9 @@ public class MainActivity extends FlutterActivity {
         super.onResume();
         isAppInForeground = true;
         configureLockScreenFlags();
+        // Safety net: if a tel: number was pending before the MethodChannel/Dart
+        // listener was fully ready, retry delivery here.
+        deliverPendingDialNumberIfAny();
         if (CallvynInCallService.instance != null) {
             CallvynInCallService.instance.dismissOngoingCallNotification();
             CallvynInCallService.instance.dismissIncomingCallNotification();
@@ -217,6 +273,13 @@ public class MainActivity extends FlutterActivity {
     protected void onNewIntent(@NonNull Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+
+        String dialNumber = extractDialNumberFromIntent(intent);
+        if (dialNumber != null && !dialNumber.isEmpty()) {
+            pendingDialNumber = dialNumber;
+            deliverPendingDialNumberIfAny();
+        }
+
         if (intent.getBooleanExtra("is_incoming", false)) {
             wasLaunchedByIncoming = true;
             String incomingNum = intent.getStringExtra("incoming_number") != null ? intent.getStringExtra("incoming_number") : "";
@@ -271,10 +334,13 @@ public class MainActivity extends FlutterActivity {
         flutterEngine.getPlugins().add(new VideoCallPlugin());
         flutterEngine.getPlatformViewsController().getRegistry().registerViewFactory("com.callvyn.video/remote_view", new CallvynVideoView.CallvynRemoteVideoViewFactory());
         flutterEngine.getPlatformViewsController().getRegistry().registerViewFactory("com.callvyn.video/local_view", new CallvynVideoView.CallvynLocalVideoViewFactory());
+        flutterEngine.getPlatformViewsController().getRegistry().registerViewFactory("com.sonoou.callvyndialer/remote_video_view", new CallvynVideoView.CallvynRemoteVideoViewFactory());
+        flutterEngine.getPlatformViewsController().getRegistry().registerViewFactory("com.sonoou.callvyndialer/local_video_view", new CallvynVideoView.CallvynLocalVideoViewFactory());
 
         MethodChannel channel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL);
         methodChannel = channel;
         registerTelephonyListener();
+        deliverPendingDialNumberIfAny();
 
         Call activeCallNow = CallvynInCallService.activeCall;
         if (activeCallNow != null && activeCallNow.getState() == Call.STATE_RINGING) {

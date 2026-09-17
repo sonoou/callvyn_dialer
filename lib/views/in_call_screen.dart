@@ -195,6 +195,14 @@ class _InCallScreenState extends State<InCallScreen> with SingleTickerProviderSt
             // Background Layer: Pure AMOLED Black
             Container(color: Colors.black),
 
+            // Remote Video Stream (Full Screen)
+            if (provider.isVideoCall && isAnswered)
+              const Positioned.fill(
+                child: AndroidView(
+                  viewType: 'com.sonoou.callvyndialer/remote_video_view',
+                ),
+              ),
+
             // Image overlay layer: Subtle readability gradient for video calls
             if (provider.isVideoCall)
               Container(
@@ -203,9 +211,9 @@ class _InCallScreenState extends State<InCallScreen> with SingleTickerProviderSt
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: isAnswered ? 0.45 : 0.55),
+                      Colors.black.withValues(alpha: isAnswered ? 0.35 : 0.55),
                       Colors.transparent,
-                      Colors.black.withValues(alpha: isAnswered ? 0.65 : 0.70),
+                      Colors.black.withValues(alpha: isAnswered ? 0.55 : 0.70),
                     ],
                     stops: const [0.0, 0.40, 1.0],
                   ),
