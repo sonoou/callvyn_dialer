@@ -122,38 +122,41 @@ public class CallvynInCallService extends InCallService {
     }
 
     public static void setRemoteSurface(Surface surface) {
+        Log.d("CallvynVideo", "setRemoteSurface: " + (surface != null && surface.isValid() ? "VALID" : "NULL"));
         currentRemoteSurface = surface;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             InCallService.VideoCall vCall = (activeCall != null ? activeCall.getVideoCall() : null);
             if (vCall == null) vCall = currentVideoCall;
-            if (vCall != null) {
+            if (vCall != null && surface != null && surface.isValid()) {
                 try {
                     vCall.setDisplaySurface(surface);
+                    vCall.setDeviceOrientation(0);
                 } catch (Exception e) {
                     Log.e("CallvynVideo", "setRemoteSurface error: " + e.getMessage(), e);
                 }
             }
         }
-        if (VideoProviderWrapper.instance != null) {
-            VideoProviderWrapper.instance.setDisplaySurface(surface);
-        }
     }
 
     public static void setLocalSurface(Surface surface) {
+        Log.d("CallvynVideo", "setLocalSurface: " + (surface != null && surface.isValid() ? "VALID" : "NULL"));
         currentLocalSurface = surface;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             InCallService.VideoCall vCall = (activeCall != null ? activeCall.getVideoCall() : null);
             if (vCall == null) vCall = currentVideoCall;
-            if (vCall != null) {
+            if (vCall != null && surface != null && surface.isValid()) {
                 try {
                     vCall.setPreviewSurface(surface);
+                    String camId = VideoImsManager.getCameraId(instance != null ? instance : MainActivity.instance, false);
+                    vCall.setCamera(camId);
+                    vCall.setDeviceOrientation(0);
+                    vCall.setZoom(1.0f);
+                    vCall.requestCameraCapabilities();
+                    Log.d("CallvynVideo", "setLocalSurface: setPreviewSurface + setCamera(" + camId + ") applied");
                 } catch (Exception e) {
                     Log.e("CallvynVideo", "setLocalSurface error: " + e.getMessage(), e);
                 }
             }
-        }
-        if (VideoProviderWrapper.instance != null) {
-            VideoProviderWrapper.instance.setPreviewSurface(surface);
         }
     }
 
@@ -172,26 +175,33 @@ public class CallvynInCallService extends InCallService {
                 videoCall.setPreviewSurface(lSurface);
             }
 
+            String camId = VideoImsManager.getCameraId(instance != null ? instance : MainActivity.instance, false);
+            videoCall.setCamera(camId);
             videoCall.setDeviceOrientation(0);
             videoCall.setZoom(1.0f);
+            videoCall.requestCameraCapabilities();
         } catch (Exception e) {
             Log.e("CallvynVideo", "attachSurfaces error: " + e.getMessage(), e);
         }
     }
 
     public static void setupCamera(InCallService.VideoCall videoCall, Context context, boolean useBack, boolean force) {
+        if (videoCall == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         String camId = VideoImsManager.getCameraId(context != null ? context : instance, useBack);
-        if (VideoProviderWrapper.instance != null) {
-            VideoProviderWrapper.instance.setCamera(camId);
-        } else if (videoCall != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                videoCall.setCamera(camId);
-                videoCall.setDeviceOrientation(0);
-                videoCall.setZoom(1.0f);
-                videoCall.requestCameraCapabilities();
-            } catch (Exception e) {
-                Log.e("CallvynVideo", "setupCamera direct error: " + e.getMessage(), e);
+        try {
+            if (currentLocalSurface != null && currentLocalSurface.isValid()) {
+                videoCall.setPreviewSurface(currentLocalSurface);
             }
+            if (currentRemoteSurface != null && currentRemoteSurface.isValid()) {
+                videoCall.setDisplaySurface(currentRemoteSurface);
+            }
+            videoCall.setCamera(camId);
+            videoCall.setDeviceOrientation(0);
+            videoCall.setZoom(1.0f);
+            videoCall.requestCameraCapabilities();
+            Log.d("CallvynVideo", "setupCamera executed for camId=" + camId + " (useBack=" + useBack + ")");
+        } catch (Exception e) {
+            Log.e("CallvynVideo", "setupCamera direct error: " + e.getMessage(), e);
         }
     }
 
@@ -199,19 +209,22 @@ public class CallvynInCallService extends InCallService {
         if (videoCall == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         Log.d("CallvynVideo", "syncVideoSession called (useBack=" + useBack + ")");
         setupCamera(videoCall, context, useBack, false);
-        attachSurfaces(videoCall);
     }
 
     public static void switchCamera(boolean useBack) {
-        if (VideoProviderWrapper.instance != null) {
-            VideoProviderWrapper.instance.toggleCamera(useBack);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             InCallService.VideoCall vCall = (activeCall != null ? activeCall.getVideoCall() : null);
             if (vCall == null) vCall = currentVideoCall;
             if (vCall != null) {
-                String camId = VideoImsManager.getCameraId(instance, useBack);
+                String camId = VideoImsManager.getCameraId(instance != null ? instance : MainActivity.instance, useBack);
                 try {
+                    if (currentLocalSurface != null && currentLocalSurface.isValid()) {
+                        vCall.setPreviewSurface(currentLocalSurface);
+                    }
                     vCall.setCamera(camId);
+                    vCall.setDeviceOrientation(0);
+                    vCall.requestCameraCapabilities();
+                    Log.d("CallvynVideo", "switchCamera applied camId=" + camId);
                 } catch (Exception e) {
                     Log.e("CallvynVideo", "switchCamera direct error: " + e.getMessage(), e);
                 }

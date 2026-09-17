@@ -196,7 +196,7 @@ class _InCallScreenState extends State<InCallScreen> with SingleTickerProviderSt
             Container(color: Colors.black),
 
             // Remote Video Stream (Full Screen)
-            if (provider.isVideoCall && isAnswered)
+            if (provider.isVideoCall && (isAnswered || isRinging))
               const Positioned.fill(
                 child: AndroidView(
                   viewType: 'com.sonoou.callvyndialer/remote_video_view',
@@ -779,8 +779,8 @@ class _InCallScreenState extends State<InCallScreen> with SingleTickerProviderSt
               ),
             ),
 
-            // Floating Local Video Preview (Picture-in-Picture) for Active Video Call
-            if (isAnswered && provider.isVideoCall && !_cameraClosed)
+            // Floating Local Video Preview (Picture-in-Picture) for Active/Dialing Video Call
+            if ((isAnswered || isRinging) && provider.isVideoCall && !_cameraClosed)
               Positioned(
                 top: topPadding + 16,
                 right: 16,

@@ -20,6 +20,11 @@ public class CallvynVideoView {
         public CallvynRemoteVideoPlatformView(Context context) {
             this.textureView = new TextureView(context);
             this.textureView.setSurfaceTextureListener(this);
+            if (this.textureView.isAvailable() && this.textureView.getSurfaceTexture() != null) {
+                Surface s = new Surface(this.textureView.getSurfaceTexture());
+                this.surface = s;
+                CallvynInCallService.setRemoteSurface(s);
+            }
         }
 
         @Override
@@ -78,6 +83,11 @@ public class CallvynVideoView {
         public CallvynLocalVideoPlatformView(Context context) {
             this.textureView = new TextureView(context);
             this.textureView.setSurfaceTextureListener(this);
+            if (this.textureView.isAvailable() && this.textureView.getSurfaceTexture() != null) {
+                Surface s = new Surface(this.textureView.getSurfaceTexture());
+                this.surface = s;
+                CallvynInCallService.setLocalSurface(s);
+            }
         }
 
         @Override
